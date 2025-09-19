@@ -222,6 +222,7 @@
     <script>
         // --- constantes ---
         const DIV_X = 10, DIV_Y = 8;
+        const CENTER_TWEAK_PX = -2;   // remonte un chouïa (ajuste à -1 ou -3 si besoin)
 
         const cvs = document.getElementById('trace');
         const ctx = cvs.getContext('2d');
@@ -298,7 +299,7 @@
 
             // Échelles
             const pxPerDivY = H / DIV_Y;
-            const centerY = yCenterDiv * pxPerDivY;   // 0 V si offset = 0
+            const centerY = yCenterDiv * pxPerDivY + CENTER_TWEAK_PX;   // 0 V si offset = 0
             const pxPerVolt = pxPerDivY / vPerDiv;
 
             // Nettoyage
@@ -313,7 +314,7 @@
             ctx.stroke();
 
             // Trace verte épaissie (type oscillo 80s)
-            ctx.lineWidth = 6;           // ≈ ×3
+            ctx.lineWidth = 4;           // ≈ ×3
             ctx.strokeStyle = '#0a7d2c'; // vert foncé
             ctx.beginPath();
             for (let i = 0; i < pts.length; i++) {
