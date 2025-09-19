@@ -7,18 +7,23 @@
     <title>Oscilloscope pédagogique</title>
     <style>
         :root {
-            --screen-left: 120px;
-            /* position de l'écran dans l'image */
-            --screen-top: 124px;
-            --screen-width: 610px;
-            /* taille approximative de la zone blanche quadrillée */
-            --screen-height: 460px;
-            --knob-v-left: 895px;
-            /* centre visuel du bouton V/div dans l'image */
-            --knob-v-top: 170px;
-            --knob-t-left: 900px;
-            /* centre visuel du bouton sec/div */
-            --knob-t-top: 430px;
+            /* Coordonnées relatives (en %) -> restent calées quand on redimensionne */
+            --screen-left: 10.91%;
+            /* 120 / 1100 */
+            --screen-top: 17.7%;
+            /* ~124 / 700  */
+            --screen-width: 55.45%;
+            /* 610 / 1100 */
+            --screen-height: 65.7%;
+            /* ~460 / 700  */
+            --knob-v-left: 81.36%;
+            /* 895 / 1100 */
+            --knob-v-top: 24.3%;
+            /* ~170 / 700  */
+            --knob-t-left: 81.8%;
+            /* 900 / 1100 */
+            --knob-t-top: 61.4%;
+            /* ~430 / 700  */
         }
 
         html,
@@ -27,21 +32,21 @@
             margin: 0;
             background: #0e0f12;
             color: #111;
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
         }
 
         .wrap {
             display: grid;
             place-items: center;
             min-height: 100%;
-            padding: 24px;
+            padding: 12px;
         }
 
+        /* => Toujours ENTIER dans l’écran (ratio image ≈ 1.454) */
         .scope {
             position: relative;
-            width: 1100px;
-            /* largeur du PNG fourni */
-            max-width: 95vw;
+            width: min(96vw, calc(96vh * 1.454));
+            max-width: 1400px;
             filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .35));
         }
 
@@ -54,7 +59,6 @@
             -webkit-user-drag: none;
         }
 
-        /* Calques interactifs */
         canvas#trace {
             position: absolute;
             left: var(--screen-left);
@@ -62,7 +66,6 @@
             width: var(--screen-width);
             height: var(--screen-height);
             pointer-events: none;
-            /* La souris ne capte pas ce calque */
         }
 
         .hotspot {
@@ -77,7 +80,6 @@
 
         .hotspot select,
         .hotspot input[type="number"],
-        .hotspot input[type="range"],
         .hotspot button {
             appearance: none;
             background: #fff;
@@ -98,7 +100,6 @@
             border: 1px solid #dfe3ea;
         }
 
-        /* Deux hotspots alignés sur les boutons visuels de l'image */
         #vdiv-hotspot {
             left: var(--knob-v-left);
             top: var(--knob-v-top);
@@ -109,7 +110,6 @@
             top: var(--knob-t-top);
         }
 
-        /* Panneau paramètres signal */
         .panel {
             position: absolute;
             left: clamp(10px, 2vw, 24px);
@@ -164,44 +164,21 @@
             padding: 1px 6px;
             border-radius: 6px;
         }
-
-        @media (max-width: 900px) {
-            :root {
-                --screen-left: 100px;
-                --screen-top: 102px;
-                --screen-width: 505px;
-                --screen-height: 380px;
-                --knob-v-left: 745px;
-                --knob-v-top: 140px;
-                --knob-t-left: 750px;
-                --knob-t-top: 356px;
-            }
-
-            .panel {
-                transform: scale(.92);
-                transform-origin: top left;
-            }
-        }
     </style>
 </head>
 
 <body>
     <div class="wrap">
         <div class="scope" id="scope">
-            <!-- IMPORTANT : placez le fichier "Oscilloscope.png" dans le même dossier que cette page -->
             <img src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
-
-            <!-- calque du signal -->
             <canvas id="trace" width="1220" height="920" aria-hidden="true"></canvas>
 
-            <!-- Hotspots sur les boutons V/div et sec/div -->
             <div class="hotspot" id="vdiv-hotspot">
                 <label for="vdiv">V / div</label>
                 <select id="vdiv">
-                    <!-- valeurs en volts/div (incluant mV) dans l'ordre de l'illustration -->
                     <option value="5">5 V/div</option>
                     <option value="2">2 V/div</option>
-                    <option value="1">1 V/div</option>
+                    <option value="1" selected>1 V/div</option>
                     <option value="0.5">0,5 V/div</option>
                     <option value="0.2">0,2 V/div</option>
                     <option value="0.1">0,1 V/div</option>
@@ -217,7 +194,6 @@
             <div class="hotspot" id="tdiv-hotspot">
                 <label for="tdiv">sec / div</label>
                 <select id="tdiv">
-                    <!-- valeurs en secondes/div -->
                     <option value="0.5">0,5 s/div</option>
                     <option value="0.2">0,2 s/div</option>
                     <option value="0.1">0,1 s/div</option>
@@ -233,7 +209,6 @@
                 </select>
             </div>
 
-            <!-- Panneau paramètres d'entrée -->
             <form class="panel" id="controls">
                 <h2>Paramètres du signal</h2>
                 <label>Forme
@@ -255,31 +230,19 @@
                 <label>Périodes à afficher
                     <input id="cycles" type="number" min="0.25" step="0.25" value="2" />
                 </label>
-                <div class="full">
-                    <button type="button" id="reset">Réinitialiser centrage</button>
-                </div>
+                <div class="full"><button type="button" id="reset">Réinitialiser centrage</button></div>
             </form>
 
             <div class="legend">
                 <div>Écran : 10 divisions horizontales × 8 divisions verticales.</div>
                 <div>Échelle verticale : <code>V/div</code> — horizontale : <code>s/div</code>.</div>
-                <div>Amplitude saisie = valeur crête (soit Vp ; Vpp = 2×Amplitude).</div>
+                <div>Amplitude saisie = valeur crête (Vp ; Vpp = 2×Amplitude).</div>
             </div>
         </div>
     </div>
 
     <script>
-        // === Constantes de l'écran ===
-        const screen = {
-            left: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-left')),
-            top: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-top')),
-            width: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-width')),
-            height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--screen-height')),
-            divX: 10,
-            divY: 8
-        };
-
-        // Canvas de trace (mise à l'échelle en CSS → gérer DPR)
+        const screen = { divX: 10, divY: 8 };
         const cvs = document.getElementById('trace');
         const ctx = cvs.getContext('2d');
 
@@ -288,10 +251,9 @@
             const dpr = window.devicePixelRatio || 1;
             cvs.width = Math.round(rect.width * dpr);
             cvs.height = Math.round(rect.height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // dessiner en unités CSS
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
 
-        // Paramètres
         const ui = {
             wave: document.getElementById('wave'),
             freq: document.getElementById('freq'),
@@ -303,107 +265,83 @@
             reset: document.getElementById('reset')
         };
 
-        // Centrage vertical de la trace (0 = centre). On peut imaginer le déplacer plus tard.
-        let yCenterDiv = screen.divY / 2; // centre en divisions
-
+        let yCenterDiv = screen.divY / 2; // centre vertical (0 V au milieu)
         ui.reset.addEventListener('click', () => { yCenterDiv = screen.divY / 2; draw(); });
 
-        // Génération d'échantillons temporels sur la largeur de l'écran
         function generateSamples() {
             const width = cvs.getBoundingClientRect().width;
             const points = [];
 
-            const vPerDiv = parseFloat(ui.vdiv.value); // V/div
-            const sPerDiv = parseFloat(ui.tdiv.value); // s/div
-            const secTotal = sPerDiv * screen.divX;    // durée affichée sur 10 divisions
+            const vPerDiv = parseFloat(ui.vdiv.value);
+            const sPerDiv = parseFloat(ui.tdiv.value);
+            const secTotal = sPerDiv * screen.divX;   // durée totale affichée
 
             const f = Math.max(0.000001, parseFloat(ui.freq.value));
             const A = parseFloat(ui.amp.value);
             const DC = parseFloat(ui.offset.value);
 
-            // échantillonnage pixel par pixel pour un rendu net
             const stepT = secTotal / (width - 1);
             for (let x = 0; x < width; x++) {
-                const t = x * stepT;
+                // -> CENTRAGE HORIZONTAL : t = 0 au MILIEU de l’écran
+                const t = (x * stepT) - (secTotal / 2);
                 let y = 0;
                 const phase = 2 * Math.PI * f * t;
+
                 switch (ui.wave.value) {
-                    case 'sine':
-                        y = A * Math.sin(phase); // en Volts (crête)
-                        break;
-                    case 'square': {
-                        const s = Math.sin(phase);
-                        y = (s >= 0 ? A : -A);
-                        break;
-                    }
+                    case 'sine': y = A * Math.sin(phase); break;
+                    case 'square': y = (Math.sin(phase) >= 0 ? A : -A); break;
                     case 'triangle': {
-                        // onde triangle centrée : 2*|2*(t/T - floor(t/T+0.5))| - 1
                         const T = 1 / f;
                         const frac = (t / T) - Math.floor(t / T + 0.5);
-                        y = A * (2 * Math.abs(2 * frac) - 1); // amplitude crête A
+                        y = A * (2 * Math.abs(2 * frac) - 1);
                         break;
                     }
                 }
-                y += DC; // composante continue
+                y += DC;
                 points.push({ x, y });
             }
-            return { points, vPerDiv, sPerDiv };
+            return { points, vPerDiv };
         }
 
         function draw() {
             resizeCanvasToCSS();
             const { points, vPerDiv } = generateSamples();
 
-            // conversions division → pixels
-            const pxPerDivX = cvs.getBoundingClientRect().width / screen.divX;
-            const pxPerDivY = cvs.getBoundingClientRect().height / screen.divY;
+            const rect = cvs.getBoundingClientRect();
+            const pxPerDivX = rect.width / screen.divX;
+            const pxPerDivY = rect.height / screen.divY;
             const pxPerVolt = pxPerDivY / vPerDiv;
 
-            // fond transparent (on laisse voir la grille de l'image)
             ctx.clearRect(0, 0, cvs.width, cvs.height);
 
-            // Axe central (optionnel subtil)
+            // Axe horizontal central (0 V)
             ctx.save();
             ctx.globalAlpha = 0.12;
             ctx.strokeStyle = '#000';
             ctx.beginPath();
             ctx.moveTo(0, (screen.divY / 2) * pxPerDivY);
-            ctx.lineTo(cvs.getBoundingClientRect().width, (screen.divY / 2) * pxPerDivY);
+            ctx.lineTo(rect.width, (screen.divY / 2) * pxPerDivY);
             ctx.stroke();
             ctx.restore();
 
-            // Trace
+            // Trace du signal
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#1a73e8';
             ctx.beginPath();
             for (let i = 0; i < points.length; i++) {
                 const p = points[i];
                 const x = p.x;
-                // y=0 au centre → convertir en pixels (haut positif négatif)
-                const yDiv = yCenterDiv - (p.y / vPerDiv); // en divisions
+                const yDiv = yCenterDiv - (p.y / vPerDiv);
                 const y = yDiv * pxPerDivY;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             }
             ctx.stroke();
-
-            // Clipping doux pour éviter de dépasser le bezel
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.fillStyle = 'rgba(255,255,255,0.999)';
-            ctx.fillRect(0, 0, cvs.getBoundingClientRect().width, cvs.getBoundingClientRect().height);
-            ctx.restore();
         }
 
-        // Écoute des changements
         ['change', 'input'].forEach(ev => {
             Object.values(ui).forEach(el => el && el.addEventListener(ev, draw));
         });
-
-        // Redessiner au redimensionnement
         window.addEventListener('resize', draw);
-
-        // init
         draw();
     </script>
 </body>
