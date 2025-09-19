@@ -7,7 +7,7 @@
     <title>Oscilloscope pédagogique</title>
     <style>
         :root {
-            /* Position & taille de l'écran (en %) par rapport à l'image de fond */
+            /* Zone écran (en %) repérée sur l'image fournie */
             --screen-left: 10.91%;
             /* ~120 / 1100 */
             --screen-top: 17.7%;
@@ -16,6 +16,8 @@
             /* 610 / 1100  */
             --screen-height: 65.7%;
             /* ~460 / 700  */
+
+            /* Centres visuels des boutons (pour les hotspots) */
             --knob-v-left: 81.36%;
             --knob-v-top: 24.3%;
             --knob-t-left: 81.8%;
@@ -55,7 +57,7 @@
             -webkit-user-drag: none;
         }
 
-        /* Le canvas correspond exactement à la zone de quadrillage → rien ne déborde */
+        /* Canvas exactement à la taille de l'écran quadrillé → rien ne déborde */
         #trace {
             position: absolute;
             left: var(--screen-left);
@@ -63,7 +65,6 @@
             width: var(--screen-width);
             height: var(--screen-height);
             pointer-events: none;
-            /* on laisse passer la souris */
         }
 
         .hotspot {
@@ -149,12 +150,12 @@
 
 <body>
     <div class="wrap">
-        <div class="scope">
-            <img src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
-            <!-- Canvas strictement à la taille de l’écran -->
+        <div class="scope" id="scope">
+            <img id="bg" src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
+            <!-- Canvas strictement à la zone de l’écran -->
             <canvas id="trace" width="800" height="600" aria-hidden="true"></canvas>
 
-            <!-- Boutons virtuels V/div et s/div -->
+            <!-- Hotspots de réglages -->
             <div class="hotspot" id="vdiv-hotspot">
                 <label for="vdiv">V / div</label>
                 <select id="vdiv">
@@ -172,6 +173,7 @@
                     <option value="0.001">1 mV/div</option>
                 </select>
             </div>
+
             <div class="hotspot" id="tdiv-hotspot">
                 <label for="tdiv">sec / div</label>
                 <select id="tdiv">
@@ -218,7 +220,7 @@
     </div>
 
     <script>
-        // constantes
+        // --- constantes ---
         const DIV_X = 10, DIV_Y = 8;
 
         const cvs = document.getElementById('trace');
@@ -236,32 +238,38 @@
             reset: document.getElementById('reset')
         };
 
+        // Position verticale de la trace (0 au centre)
         let yCenterDiv = DIV_Y / 2;
         ui.reset.addEventListener('click', () => { yCenterDiv = DIV_Y / 2; draw(); });
 
+        // Canvas = taille CSS × DPR
         function resizeCanvasToCSS() {
             const rect = cvs.getBoundingClientRect();
+            if (rect.width < 2 || rect.height < 2) return false; // layout pas prêt
             const dpr = window.devicePixelRatio || 1;
             cvs.width = Math.round(rect.width * dpr);
             cvs.height = Math.round(rect.height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // unités CSS
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // dessiner en unités CSS
+            return true;
         }
 
+        // Génère des points échantillonnés sur la largeur visible
         function generateSamples() {
-            const w = cvs.getBoundingClientRect().width;
+            const w = Math.max(2, cvs.getBoundingClientRect().width);
 
             const vPerDiv = parseFloat(ui.vdiv.value); // V/div
             const sPerDiv = parseFloat(ui.tdiv.value); // s/div
-            const secTotal = sPerDiv * DIV_X;          // durée affichée sur 10 div
+            const secTotal = sPerDiv * DIV_X;          // 10 divisions à l'écran
 
             const f = Math.max(0.000001, parseFloat(ui.freq.value));
-            const A = parseFloat(ui.amp.value);
+            const A = Math.abs(parseFloat(ui.amp.value));
             const DC = parseFloat(ui.offset.value);
 
-            const stepT = secTotal / Math.max(1, (w - 1)); // temps par pixel
+            const stepT = secTotal / (w - 1);
             const pts = [];
             for (let x = 0; x < w; x++) {
-                const t = (x * stepT) - (secTotal / 2); // CENTRÉ horizontalement
+                // Centrage temporel : t = 0 au milieu de l'écran
+                const t = (x * stepT) - (secTotal / 2);
                 let y = 0;
                 const ph = 2 * Math.PI * f * t;
                 switch (ui.wave.value) {
@@ -281,22 +289,22 @@
         }
 
         function draw() {
-            resizeCanvasToCSS();
+            if (!resizeCanvasToCSS()) return;
 
             const rect = cvs.getBoundingClientRect();
             const W = rect.width, H = rect.height;
 
             const { pts, vPerDiv, DC } = generateSamples();
 
-            // échelles
+            // Échelles
             const pxPerDivY = H / DIV_Y;
-            const centerY = (yCenterDiv) * pxPerDivY;
+            const centerY = yCenterDiv * pxPerDivY;   // 0 V si offset = 0
             const pxPerVolt = pxPerDivY / vPerDiv;
 
-            // clear
+            // Nettoyage
             ctx.clearRect(0, 0, W, H);
 
-            // ligne DC (rouge)
+            // Ligne DC (rouge)
             ctx.lineWidth = 2;
             ctx.strokeStyle = '#d11';
             ctx.beginPath();
@@ -304,9 +312,9 @@
             ctx.moveTo(0, yDC); ctx.lineTo(W, yDC);
             ctx.stroke();
 
-            // trace verte (épaisse, style oscillo 80s)
-            ctx.lineWidth = 6;              // ≈ ×3
-            ctx.strokeStyle = '#0a7d2c';    // vert foncé
+            // Trace verte épaissie (type oscillo 80s)
+            ctx.lineWidth = 6;           // ≈ ×3
+            ctx.strokeStyle = '#0a7d2c'; // vert foncé
             ctx.beginPath();
             for (let i = 0; i < pts.length; i++) {
                 const p = pts[i];
@@ -317,14 +325,24 @@
             ctx.stroke();
         }
 
-        // événements
+        // ---- INIT robuste : attendre l'image + redraw sur changements de taille ----
+        const bg = document.getElementById('bg');
+        const ro = new ResizeObserver(() => draw());
+
+        function init() {
+            ro.observe(document.getElementById('scope'));
+            ro.observe(cvs);
+            requestAnimationFrame(() => { draw(); setTimeout(draw, 80); });
+        }
+        if (bg.complete) init(); else bg.addEventListener('load', init, { once: true });
+
+        // Sécurité : on redessine aussi au resize fenêtre
+        window.addEventListener('resize', draw);
+
+        // Écoute des contrôles
         ['change', 'input'].forEach(ev => {
             Object.values(ui).forEach(el => el && el.addEventListener(ev, draw));
         });
-        window.addEventListener('resize', draw);
-
-        // init
-        draw();
     </script>
 </body>
 
