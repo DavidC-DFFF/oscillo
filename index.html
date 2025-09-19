@@ -1,198 +1,241 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Oscilloscope pédagogique</title>
-    <style>
-        html,
-        body {
-            height: 100%;
-            margin: 0;
-            background: #0e0f12;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oscilloscope pédagogique</title>
+<style>
+  :root{
+    /* Position & taille de l'écran (en %) par rapport à l'image de fond */
+    --screen-left: 10.91%;   /* ~120 / 1100 */
+    --screen-top: 17.7%;     /* ~124 / 700  */
+    --screen-width: 55.45%;  /* 610 / 1100  */
+    --screen-height: 65.7%;  /* ~460 / 700  */
+    --knob-v-left: 81.36%;
+    --knob-v-top: 24.3%;
+    --knob-t-left: 81.8%;
+    --knob-t-top: 61.4%;
+  }
 
-        .scope {
-            position: relative;
-            width: 100%;
-            max-width: 1200px;
-            height: auto;
-        }
+  html, body { height:100%; margin:0; background:#0e0f12; color:#111;
+    font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; }
+  .wrap { display:grid; place-items:center; min-height:100%; padding:12px; }
 
-        .scope img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
+  /* Toujours ENTIER dans l’écran (image ~1116×768 ⇒ ratio ≈ 1.454) */
+  .scope{
+    position:relative;
+    width: min(96vw, calc(96vh * 1.454));
+    max-width: 1400px;
+    filter: drop-shadow(0 12px 24px rgba(0,0,0,.35));
+  }
+  .scope img{ width:100%; height:auto; display:block; border-radius:10px; user-select:none; -webkit-user-drag:none; }
 
-        canvas#trace {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
+  /* Le canvas correspond exactement à la zone de quadrillage → rien ne déborde */
+  #trace{
+    position:absolute;
+    left:var(--screen-left);  top:var(--screen-top);
+    width:var(--screen-width); height:var(--screen-height);
+    pointer-events:none; /* on laisse passer la souris */
+  }
 
-        .panel {
-            position: absolute;
-            top: 5%;
-            left: 5%;
-            background: rgba(255, 255, 255, .95);
-            border-radius: 10px;
-            padding: 10px;
-        }
+  .hotspot{
+    position:absolute; transform:translate(-50%,-50%);
+    display:grid; gap:6px; justify-items:center; text-align:center; z-index:5;
+  }
+  .hotspot select, .hotspot input[type="number"], .hotspot button{
+    appearance:none; background:#fff; border:1px solid #c9ccd3; border-radius:10px;
+    padding:8px 10px; font-size:14px; min-width:120px; box-shadow:0 2px 6px rgba(0,0,0,.12);
+  }
+  .hotspot label{ font-size:12px; color:#2b2b2b; background:#f0f2f5; padding:2px 8px; border-radius:999px; border:1px solid #dfe3ea; }
 
-        .legend {
-            position: absolute;
-            bottom: 2%;
-            right: 2%;
-            background: rgba(255, 255, 255, .9);
-            border-radius: 6px;
-            padding: 6px;
-            font-size: 12px;
-        }
-    </style>
+  #vdiv-hotspot{ left:var(--knob-v-left); top:var(--knob-v-top); }
+  #tdiv-hotspot{ left:var(--knob-t-left); top:var(--knob-t-top); }
+
+  .panel{
+    position:absolute; left: clamp(10px, 2vw, 24px); top: clamp(8px, 2vw, 20px);
+    background:rgba(255,255,255,.96); border:1px solid #e2e5ec; border-radius:14px;
+    padding:12px 14px; display:grid; grid-template-columns: 1fr 1fr; gap:8px 10px; z-index:10; backdrop-filter: blur(4px);
+  }
+  .panel h2{ grid-column:1/-1; margin:0 0 6px; font-size:14px; letter-spacing:.02em; color:#333; }
+  .panel label{ font-size:12px; color:#333; }
+  .panel input, .panel select{ width:150px; }
+  .panel .full{ grid-column:1/-1; }
+
+  .legend{
+    position:absolute; right: clamp(10px, 3vw, 26px); bottom: clamp(6px, 2vw, 18px);
+    background:rgba(255,255,255,.92); border:1px solid #e2e5ec; border-radius:10px; padding:8px 10px; font-size:12px; color:#222;
+  }
+  .legend code{ background:#eef2f8; padding:1px 6px; border-radius:6px; }
+</style>
 </head>
-
 <body>
-    <div class="scope">
-        <img src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
-        <canvas id="trace"></canvas>
+<div class="wrap">
+  <div class="scope">
+    <img src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
+    <!-- Canvas strictement à la taille de l’écran -->
+    <canvas id="trace" width="800" height="600" aria-hidden="true"></canvas>
 
-        <form class="panel" id="controls">
-            <label>Forme
-                <select id="wave">
-                    <option value="sine">Sinusoïdal</option>
-                    <option value="square">Carré</option>
-                    <option value="triangle">Triangle</option>
-                </select>
-            </label>
-            <label>Fréquence (Hz)
-                <input id="freq" type="number" value="50" />
-            </label>
-            <label>Amplitude crête (V)
-                <input id="amp" type="number" value="2" />
-            </label>
-            <label>Décalage DC (V)
-                <input id="offset" type="number" value="0" />
-            </label>
-            <label>Périodes à afficher
-                <input id="cycles" type="number" value="2" />
-            </label>
-        </form>
-
-        <div class="legend">Écran : 10 div horizontales × 8 div verticales.<br>Échelle verticale : V/div — horizontale :
-            s/div.<br>Ligne rouge = composante continue.</div>
+    <!-- Boutons virtuels V/div et s/div -->
+    <div class="hotspot" id="vdiv-hotspot">
+      <label for="vdiv">V / div</label>
+      <select id="vdiv">
+        <option value="5">5 V/div</option><option value="2">2 V/div</option>
+        <option value="1" selected>1 V/div</option><option value="0.5">0,5 V/div</option>
+        <option value="0.2">0,2 V/div</option><option value="0.1">0,1 V/div</option>
+        <option value="0.05">50 mV/div</option><option value="0.02">20 mV/div</option>
+        <option value="0.01">10 mV/div</option><option value="0.005">5 mV/div</option>
+        <option value="0.002">2 mV/div</option><option value="0.001">1 mV/div</option>
+      </select>
+    </div>
+    <div class="hotspot" id="tdiv-hotspot">
+      <label for="tdiv">sec / div</label>
+      <select id="tdiv">
+        <option value="0.5">0,5 s/div</option><option value="0.2">0,2 s/div</option>
+        <option value="0.1">0,1 s/div</option><option value="0.05">50 ms/div</option>
+        <option value="0.02">20 ms/div</option><option value="0.01">10 ms/div</option>
+        <option value="0.005">5 ms/div</option><option value="0.002">2 ms/div</option>
+        <option value="0.001">1 ms/div</option><option value="0.0005">0,5 ms/div</option>
+        <option value="0.0002">0,2 ms/div</option><option value="0.0001">0,1 ms/div</option>
+      </select>
     </div>
 
-    <script>
-        const cvs = document.getElementById('trace');
-        const ctx = cvs.getContext('2d');
-        // Zone de quadrillage (pour clip) exprimée en pourcentage de l'image
-        // (mesures relevées sur l'illustration fournie)
-        const SCREEN_PERC = { left: 0.1091, top: 0.177, width: 0.5545, height: 0.657 };
+    <!-- Paramètres d'entrée -->
+    <form class="panel" id="controls">
+      <h2>Paramètres du signal</h2>
+      <label>Forme
+        <select id="wave"><option value="sine">Sinusoïdal</option><option value="square">Carré</option><option value="triangle">Triangle</option></select>
+      </label>
+      <label>Fréquence (Hz)
+        <input id="freq" type="number" min="0.01" step="0.01" value="50" />
+      </label>
+      <label>Amplitude crête (V)
+        <input id="amp" type="number" min="0" step="0.01" value="2" />
+      </label>
+      <label>Décalage DC (V)
+        <input id="offset" type="number" step="0.01" value="0" />
+      </label>
+      <label>Périodes à afficher
+        <input id="cycles" type="number" min="0.25" step="0.25" value="2" />
+      </label>
+      <div class="full"><button type="button" id="reset">Réinitialiser centrage</button></div>
+    </form>
 
-        function resizeCanvas() {
-            const rect = cvs.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            cvs.width = rect.width * dpr;
-            cvs.height = rect.height * dpr;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    <div class="legend">
+      <div>Écran : 10 divisions horizontales × 8 divisions verticales.</div>
+      <div>Échelle verticale : <code>V/div</code> — horizontale : <code>s/div</code>.</div>
+      <div>Amplitude saisie = valeur crête (Vp ; Vpp = 2×Amplitude).</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // constantes
+  const DIV_X = 10, DIV_Y = 8;
+
+  const cvs = document.getElementById('trace');
+  const ctx = cvs.getContext('2d');
+
+  // UI
+  const ui = {
+    wave: document.getElementById('wave'),
+    freq: document.getElementById('freq'),
+    amp: document.getElementById('amp'),
+    offset: document.getElementById('offset'),
+    cycles: document.getElementById('cycles'),
+    vdiv: document.getElementById('vdiv'),
+    tdiv: document.getElementById('tdiv'),
+    reset: document.getElementById('reset')
+  };
+
+  let yCenterDiv = DIV_Y/2;
+  ui.reset.addEventListener('click', () => { yCenterDiv = DIV_Y/2; draw(); });
+
+  function resizeCanvasToCSS(){
+    const rect = cvs.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = Math.round(rect.width * dpr);
+    cvs.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0); // unités CSS
+  }
+
+  function generateSamples(){
+    const w = cvs.getBoundingClientRect().width;
+
+    const vPerDiv = parseFloat(ui.vdiv.value); // V/div
+    const sPerDiv = parseFloat(ui.tdiv.value); // s/div
+    const secTotal = sPerDiv * DIV_X;          // durée affichée sur 10 div
+
+    const f  = Math.max(0.000001, parseFloat(ui.freq.value));
+    const A  = parseFloat(ui.amp.value);
+    const DC = parseFloat(ui.offset.value);
+
+    const stepT = secTotal / Math.max(1, (w - 1)); // temps par pixel
+    const pts = [];
+    for (let x=0; x<w; x++){
+      const t = (x * stepT) - (secTotal/2); // CENTRÉ horizontalement
+      let y = 0;
+      const ph = 2*Math.PI*f*t;
+      switch (ui.wave.value){
+        case 'sine':     y = A * Math.sin(ph); break;
+        case 'square':   y = (Math.sin(ph) >= 0 ? A : -A); break;
+        case 'triangle': {
+          const T = 1/f;
+          const frac = (t / T) - Math.floor(t / T + 0.5);
+          y = A * (2 * Math.abs(2*frac) - 1);
+          break;
         }
-
-        const ui = {
-            wave: document.getElementById('wave'),
-            freq: document.getElementById('freq'),
-            amp: document.getElementById('amp'),
-            offset: document.getElementById('offset'),
-            cycles: document.getElementById('cycles')
-        };
-
-        function generate() {
-            const points = [];
-            const width = cvs.getBoundingClientRect().width;
-            const f = parseFloat(ui.freq.value);
-            const A = parseFloat(ui.amp.value);
-            const DC = parseFloat(ui.offset.value);
-            const cycles = parseFloat(ui.cycles.value);
-
-            const T = 1 / f;
-            const secTotal = cycles * T;
-            const stepT = secTotal / (width - 1);
-
-            for (let x = 0; x < width; x++) {
-                const t = x * stepT;
-                let y = 0;
-                switch (ui.wave.value) {
-                    case 'sine': y = A * Math.sin(2 * Math.PI * f * t); break;
-                    case 'square': y = (Math.sin(2 * Math.PI * f * t) >= 0 ? A : -A); break;
-                    case 'triangle': {
-                        const frac = (t / T) - Math.floor(t / T + 0.5);
-                        y = A * (2 * Math.abs(2 * frac) - 1);
-                    } break;
-                }
-                y += DC;
-                points.push({ x, y });
-            }
-            return points;
-        }
-
-        function draw() {
-            resizeCanvas();
-            const points = generate();
-            const rect = cvs.getBoundingClientRect();
-            const width = rect.width; const height = rect.height;
-            ctx.clearRect(0, 0, width, height);
-
-            // Calcul de la zone "écran" (quadrillage) en pixels
-            const sx = SCREEN_PERC.left * width;
-            const sy = SCREEN_PERC.top * height;
-            const sw = SCREEN_PERC.width * width;
-            const sh = SCREEN_PERC.height * height;
-
-            // Echelles dans la zone écran
-            const centerY = sy + sh / 2;
-            const A = Math.abs(parseFloat(ui.amp.value));
-            const DC = parseFloat(ui.offset.value);
-            const scaleY = (sh / 2) / Math.max(1e-9, A + Math.abs(DC));
-
-            // Clip pour empêcher la trace de dépasser du quadrillage
-            ctx.save();
-            ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
-
-            // Trace du signal — vert foncé (style oscillo 80s)
-            ctx.lineWidth = 6;               // plus épais
-            ctx.strokeStyle = '#0a7d2c';     // vert foncé
-            ctx.beginPath();
-            points.forEach((p, i) => {
-                const x = sx + (p.x / width) * sw;          // re-map x dans la zone écran
-                const y = centerY - p.y * scaleY;
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-            });
-            ctx.stroke();
-
-            // Ligne de composante continue (offset) — rouge
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#d11';
-            ctx.beginPath();
-            const yDC = centerY - DC * scaleY;
-            ctx.moveTo(sx, yDC); ctx.lineTo(sx + sw, yDC);
-            ctx.stroke();
-
-            ctx.restore();
-        });
-        ctx.stroke();
+      }
+      y += DC;
+      pts.push({x, y});
     }
+    return {pts, vPerDiv, DC};
+  }
 
-        window.addEventListener('resize', draw);
-        Object.values(ui).forEach(el => el.addEventListener('input', draw));
-        draw();
-    </script>
+  function draw(){
+    resizeCanvasToCSS();
+
+    const rect = cvs.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+
+    const {pts, vPerDiv, DC} = generateSamples();
+
+    // échelles
+    const pxPerDivY = H / DIV_Y;
+    const centerY   = (yCenterDiv) * pxPerDivY;
+    const pxPerVolt = pxPerDivY / vPerDiv;
+
+    // clear
+    ctx.clearRect(0,0,W,H);
+
+    // ligne DC (rouge)
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#d11';
+    ctx.beginPath();
+    const yDC = centerY - DC * pxPerVolt;
+    ctx.moveTo(0, yDC); ctx.lineTo(W, yDC);
+    ctx.stroke();
+
+    // trace verte (épaisse, style oscillo 80s)
+    ctx.lineWidth = 6;              // ≈ ×3
+    ctx.strokeStyle = '#0a7d2c';    // vert foncé
+    ctx.beginPath();
+    for (let i=0;i<pts.length;i++){
+      const p = pts[i];
+      const x = p.x;
+      const y = centerY - p.y * pxPerVolt;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // événements
+  ['change','input'].forEach(ev => {
+    Object.values(ui).forEach(el => el && el.addEventListener(ev, draw));
+  });
+  window.addEventListener('resize', draw);
+
+  // init
+  draw();
+</script>
 </body>
-
 </html>
