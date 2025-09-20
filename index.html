@@ -14,7 +14,7 @@
 
         <!-- BARRE (col 2) -->
         <aside class="sidebar">
-            <form class="sidepanel" id="controls">
+            <form class="sidepanel" id="controls" autocomplete="off">
                 <h2>Entrée</h2>
 
                 <label>Forme
@@ -27,9 +27,9 @@
 
                 <label>Rapport cyclique (%)</label>
                 <div class="duty-row">
-                    <input id="duty" type="range" min="5" max="95" step="1" value="50">
+                    <input id="duty" type="range" min="5" max="95" step="1" value="50" />
                     <input id="dutyNum" type="number" min="5" max="95" step="1" value="50"
-                        aria-label="Rapport cyclique (pourcent)">
+                        aria-label="Rapport cyclique (pourcent)" />
                 </div>
 
                 <label>Amplitude crête (V)
@@ -48,10 +48,13 @@
                     <input id="per" type="number" min="0.000001" step="0.000001" value="" placeholder="auto" />
                 </label>
 
-                <label class="inline">
-                    <input id="showDC" type="checkbox" checked>
-                    Afficher la ligne DC
+                <!-- Interrupteur (toggle) pour la ligne DC -->
+                <label class="toggle">
+                    <input id="showDC" type="checkbox" checked />
+                    <span class="track" aria-hidden="true"></span>
+                    <span class="txt">Afficher la ligne DC</span>
                 </label>
+
 
                 <button type="button" id="exportPng">Exporter l'oscilloscope</button>
             </form>
@@ -65,7 +68,7 @@
                 <img id="bg" src="Oscilloscope3.png" alt="Oscilloscope pédagogique" />
                 <canvas id="trace" width="800" height="600" aria-hidden="true"></canvas>
 
-                <!-- Bouton de décalage horizontal (drag horizontal) -->
+                <!-- Bouton de décalage horizontal -->
                 <div id="hShift" class="hshift" title="Décalage horizontal (glisser)"></div>
 
                 <!-- Knobs (bulles masquées via CSS) -->
