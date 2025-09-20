@@ -12,8 +12,7 @@
             --screen-top: 17.7%;
             --screen-width: 55.45%;
             --screen-height: 65.7%;
-
-            /* Centres visuels des boutons (pour les knobs overlay) */
+            /* Centres visuels des boutons (tes mesures) */
             --knob-v-left: 85.9%;
             --knob-v-top: 33.9%;
             --knob-t-left: 85.9%;
@@ -63,7 +62,6 @@
             pointer-events: none;
         }
 
-        /* Panneau paramètres du signal */
         .panel {
             position: absolute;
             left: clamp(10px, 2vw, 24px);
@@ -108,7 +106,6 @@
             width: clamp(90px, 12vw, 150px);
             height: clamp(90px, 12vw, 150px);
             border-radius: 50%;
-            /* zone cliquable invisible par-dessus le bouton de l'image */
             cursor: grab;
             z-index: 8;
         }
@@ -117,7 +114,6 @@
             cursor: grabbing;
         }
 
-        /* Aiguille visuelle */
         .knob .needle {
             position: absolute;
             left: 50%;
@@ -131,7 +127,6 @@
             transform-origin: 50% 100%;
         }
 
-        /* Pastille centrale (esthétique) */
         .knob .cap {
             position: absolute;
             left: 50%;
@@ -145,7 +140,6 @@
             box-shadow: inset 0 2px 3px rgba(0, 0, 0, .2);
         }
 
-        /* Bulles valeur courante (petit rappel discret) */
         .knob .value {
             position: absolute;
             left: 50%;
@@ -161,7 +155,6 @@
             user-select: none;
         }
 
-        /* Positions sur l'image */
         #knobV {
             left: var(--knob-v-left);
             top: var(--knob-v-top);
@@ -225,12 +218,13 @@
         const DIV_X = 10, DIV_Y = 8;
         const CENTER_TWEAK_PX = -2; // remonte subtilement la trace pour coïncider au centre visuel
 
-        // Calibres (dans l'ordre correspondant au sens horaire du bouton)
+        // Calibres (ordre horaire)
         const VDIV_STEPS = [5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001];
         const TDIV_STEPS = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001];
 
-        // Angles de rotation (style knob : -135° → +135°)
-        const MIN_ANGLE = 0, MAX_ANGLE = 330;
+        // Indices de départ (1 V/div ; 2 ms/div)
+        let vIndex = VDIV_STEPS.indexOf(1);
+        let tIndex = TDIV_STEPS.indexOf(0.002);
 
         const cvs = document.getElementById('trace');
         const ctx = cvs.getContext('2d');
@@ -245,47 +239,24 @@
             reset: document.getElementById('reset')
         };
 
-        // Knobs
-        const knobV = document.getElementById('knobV');
-        const knobT = document.getElementById('knobT');
-        const vNeedle = document.getElementById('vNeedle');
-        const tNeedle = document.getElementById('tNeedle');
-        const vLabel = document.getElementById('vdivVal');
-        const tLabel = document.getElementById('tdivVal');
-
-        // Indices de départ (1 V/div ; 2 ms/div)
-        let vIndex = VDIV_STEPS.indexOf(1);
-        let tIndex = TDIV_STEPS.indexOf(0.002);
-
-        // Position verticale de la trace (0 au centre)
+        // Position verticale (0 au centre)
         let yCenterDiv = DIV_Y / 2;
         ui.reset.addEventListener('click', () => { yCenterDiv = DIV_Y / 2; draw(); });
 
-        // Utils
-        const fmtV = v => (v >= 1 ? `${v} V/div` : (v >= 0.001 ? `${v} V/div` : `${v * 1000} mV/div`));
-        const fmtT = s => {
-            if (s >= 1) return `${s} s/div`;
-            if (s >= 0.001) return `${s * 1000} ms/div`;
-            return `${s * 1e6} µs/div`;
-        };
-
-        function stepAngle(list, idx) { return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (idx / (list.length - 1)); }
-        function setNeedle(needle, list, idx) { needle.style.transform = `translate(-50%,-100%) rotate(${stepAngle(list, idx)}deg)`; }
-
         function resizeCanvasToCSS() {
             const rect = cvs.getBoundingClientRect();
-            if (rect.width < 2 || rect.height < 2) return false;
+            if (rect.width < 2 || rect.height < 2) return false; // layout pas prêt
             const dpr = window.devicePixelRatio || 1;
             cvs.width = Math.round(rect.width * dpr);
             cvs.height = Math.round(rect.height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // dessiner en unités CSS
             return true;
         }
 
         function generateSamples(vPerDiv, sPerDiv) {
             const w = Math.max(2, cvs.getBoundingClientRect().width);
 
-            const secTotal = sPerDiv * DIV_X;          // 10 divisions à l'écran
+            const secTotal = sPerDiv * DIV_X;          // 10 divisions
             const f = Math.max(0.000001, parseFloat(ui.freq.value));
             const A = Math.abs(parseFloat(ui.amp.value));
             const DC = parseFloat(ui.offset.value);
@@ -339,7 +310,7 @@
             ctx.moveTo(0, yDC); ctx.lineTo(W, yDC);
             ctx.stroke();
 
-            // Trace verte (un peu plus fine que précédemment)
+            // Trace verte (épaisseur raisonnable)
             ctx.lineWidth = 4;
             ctx.strokeStyle = '#0a7d2c';
             ctx.beginPath();
@@ -352,42 +323,71 @@
             ctx.stroke();
         }
 
-        // ---- KNOB INTERACTION (souris + tactile) ----
-        function attachKnob(el, list, getIdx, setIdx, labelEl, fmt, needleEl) {
+        // -------- KNOB DRAG (0° en haut, 0→330°) --------
+        const MIN_ANGLE = 0, MAX_ANGLE = 330;
+
+        function stepAngle(list, idx) {
+            return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (idx / (list.length - 1));
+        }
+        function setNeedle(needle, list, idx) {
+            const deg = stepAngle(list, idx);
+            needle.style.transform = `translate(-50%,-100%) rotate(${deg}deg)`; // 0° = haut
+        }
+
+        // Angle polaire en degrés, 0° en HAUT, sens HORAIRE, 0..360
+        function polarAngleCWdeg(x, y) {
+            let a = Math.atan2(y, x) * 180 / Math.PI;  // [-180,180]
+            a = (a + 450) % 360;                     // 0..360, 0° en haut, CW
+            return a;
+        }
+        function angleFromEvent(e, el) {
+            const r = el.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const ex = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
+            const ey = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
+            let ang = polarAngleCWdeg(ex, ey);              // 0..360
+            ang = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, ang)); // clamp 0..330
+            return ang;
+        }
+        function idxFromAngle(ang, list) {
+            const ratio = (ang - MIN_ANGLE) / (MAX_ANGLE - MIN_ANGLE); // 0..1
+            return Math.max(0, Math.min(list.length - 1, Math.round(ratio * (list.length - 1))));
+        }
+
+        const vNeedle = document.getElementById('vNeedle');
+        const tNeedle = document.getElementById('tNeedle');
+        const vLabel = document.getElementById('vdivVal');
+        const tLabel = document.getElementById('tdivVal');
+
+        const fmtV = v => (v >= 1 ? `${v} V/div` : (v >= 0.001 ? `${v} V/div` : `${v * 1000} mV/div`));
+        function fmtT(s) {
+            if (s >= 1) return `${s} s/div`;
+            if (s >= 0.001) return `${s * 1000} ms/div`;
+            return `${s * 1e6} µs/div`;
+        }
+
+        function attachKnobDrag(el, list, getIdx, setIdx, labelEl, fmt, needleEl) {
             let dragging = false;
 
-            function updateLabel() {
-                labelEl.textContent = fmt(list[getIdx()]);
-                setNeedle(needleEl, list, getIdx());
-                draw();
+            function applyIndex(i) {
+                const idx = Math.max(0, Math.min(list.length - 1, i));
+                if (idx !== getIdx()) {
+                    setIdx(idx);
+                    labelEl.textContent = fmt(list[idx]);
+                    setNeedle(needleEl, list, idx);
+                    draw();
+                }
             }
-
-            function angleFromEvent(e) {
-                const r = el.getBoundingClientRect();
-                const cx = r.left + r.width / 2;
-                const cy = r.top + r.height / 2;
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
-                let ang = Math.atan2(y, x) * 180 / Math.PI; // -180..180 (0° = +x)
-                // Convertir pour que 0° soit en haut et angle croisse dans le sens horaire
-                ang = 90 + ang;
-                // Normaliser -180..180
-                if (ang > 180) ang -= 360;
-                return Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, ang));
+            function onDown(e) {
+                dragging = true; e.preventDefault(); onMove(e);
             }
-
-            function idxFromAngle(ang) {
-                const ratio = (ang - MIN_ANGLE) / (MAX_ANGLE - MIN_ANGLE); // 0..1
-                const idx = Math.round(ratio * (list.length - 1));
-                return Math.max(0, Math.min(list.length - 1, idx));
-            }
-
-            function onDown(e) { dragging = true; e.preventDefault(); el.setPointerCapture?.(e.pointerId); onMove(e); }
             function onMove(e) {
                 if (!dragging) return;
-                const ang = angleFromEvent(e);
-                const idx = idxFromAngle(ang);
-                if (idx !== getIdx()) { setIdx(idx); updateLabel(); }
+                e.preventDefault();
+                const ang = angleFromEvent(e, el);       // 0..330
+                const idx = idxFromAngle(ang, list);     // snap au cran le + proche
+                applyIndex(idx);
             }
             function onUp() { dragging = false; }
 
@@ -401,24 +401,24 @@
             window.addEventListener('touchend', onUp);
 
             // init visuelle
-            updateLabel();
+            labelEl.textContent = fmt(list[getIdx()]);
+            setNeedle(needleEl, list, getIdx());
         }
 
-        attachKnob(
-            knobV, VDIV_STEPS,
+        attachKnobDrag(
+            document.getElementById('knobV'), VDIV_STEPS,
             () => vIndex, (i) => { vIndex = i; },
             vLabel, fmtV, vNeedle
         );
-        attachKnob(
-            knobT, TDIV_STEPS,
+        attachKnobDrag(
+            document.getElementById('knobT'), TDIV_STEPS,
             () => tIndex, (i) => { tIndex = i; },
             tLabel, fmtT, tNeedle
         );
 
-        // ---- INIT robuste : attendre l'image + redraw sur changements de taille ----
+        // ---- INIT robuste : attendre l'image + redraw sur resize ----
         const bg = document.getElementById('bg');
         const ro = new ResizeObserver(() => draw());
-
         function init() {
             ro.observe(document.getElementById('scope'));
             ro.observe(cvs);
@@ -426,7 +426,7 @@
         }
         if (bg.complete) init(); else bg.addEventListener('load', init, { once: true });
 
-        // Sécurité : on redessine aussi au resize fenêtre + changements des paramètres
+        // Redessiner si fenêtre redimensionnée + si paramètres changent
         window.addEventListener('resize', draw);
         ['change', 'input'].forEach(ev => {
             Object.values(ui).forEach(el => el && el.addEventListener(ev, draw));
