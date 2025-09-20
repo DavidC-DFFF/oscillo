@@ -9,19 +9,15 @@
         :root {
             /* Zone écran (en %) repérée sur l'image fournie */
             --screen-left: 10.91%;
-            /* ~120 / 1100 */
             --screen-top: 17.7%;
-            /* ~124 / 700  */
             --screen-width: 55.45%;
-            /* 610 / 1100  */
             --screen-height: 65.7%;
-            /* ~460 / 700  */
 
-            /* Centres visuels des boutons (pour les hotspots) */
-            --knob-v-left: 81.36%;
-            --knob-v-top: 24.3%;
-            --knob-t-left: 81.8%;
-            --knob-t-top: 61.4%;
+            /* Centres visuels des boutons (pour les knobs overlay) */
+            --knob-v-left: 85.9%;
+            --knob-v-top: 33.9%;
+            --knob-t-left: 85.9%;
+            --knob-t-top: 74.4%;
         }
 
         html,
@@ -67,48 +63,7 @@
             pointer-events: none;
         }
 
-        .hotspot {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            display: grid;
-            gap: 6px;
-            justify-items: center;
-            text-align: center;
-            z-index: 5;
-        }
-
-        .hotspot select,
-        .hotspot input[type="number"],
-        .hotspot button {
-            appearance: none;
-            background: #fff;
-            border: 1px solid #c9ccd3;
-            border-radius: 10px;
-            padding: 8px 10px;
-            font-size: 14px;
-            min-width: 120px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
-        }
-
-        .hotspot label {
-            font-size: 12px;
-            color: #2b2b2b;
-            background: #f0f2f5;
-            padding: 2px 8px;
-            border-radius: 999px;
-            border: 1px solid #dfe3ea;
-        }
-
-        #vdiv-hotspot {
-            left: var(--knob-v-left);
-            top: var(--knob-v-top);
-        }
-
-        #tdiv-hotspot {
-            left: var(--knob-t-left);
-            top: var(--knob-t-top);
-        }
-
+        /* Panneau paramètres du signal */
         .panel {
             position: absolute;
             left: clamp(10px, 2vw, 24px);
@@ -145,6 +100,77 @@
         .panel .full {
             grid-column: 1/-1;
         }
+
+        /* --- KNOBS (boutons rotatifs) --- */
+        .knob {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: clamp(90px, 12vw, 150px);
+            height: clamp(90px, 12vw, 150px);
+            border-radius: 50%;
+            /* zone cliquable invisible par-dessus le bouton de l'image */
+            cursor: grab;
+            z-index: 8;
+        }
+
+        .knob:active {
+            cursor: grabbing;
+        }
+
+        /* Aiguille visuelle */
+        .knob .needle {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -100%) rotate(0deg);
+            width: 4px;
+            height: 45%;
+            background: #111;
+            border-radius: 4px;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, .8), 0 1px 4px rgba(0, 0, 0, .3);
+            transform-origin: 50% 100%;
+        }
+
+        /* Pastille centrale (esthétique) */
+        .knob .cap {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 18%;
+            height: 18%;
+            border-radius: 50%;
+            background: #e9e7df;
+            border: 1px solid rgba(0, 0, 0, .25);
+            box-shadow: inset 0 2px 3px rgba(0, 0, 0, .2);
+        }
+
+        /* Bulles valeur courante (petit rappel discret) */
+        .knob .value {
+            position: absolute;
+            left: 50%;
+            top: -10px;
+            transform: translate(-50%, -100%);
+            font-size: 12px;
+            background: #fff;
+            border: 1px solid #c9ccd3;
+            border-radius: 10px;
+            padding: 4px 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        /* Positions sur l'image */
+        #knobV {
+            left: var(--knob-v-left);
+            top: var(--knob-v-top);
+        }
+
+        #knobT {
+            left: var(--knob-t-left);
+            top: var(--knob-t-top);
+        }
     </style>
 </head>
 
@@ -155,41 +181,16 @@
             <!-- Canvas strictement à la zone de l’écran -->
             <canvas id="trace" width="800" height="600" aria-hidden="true"></canvas>
 
-            <!-- Hotspots de réglages -->
-            <div class="hotspot" id="vdiv-hotspot">
-                <label for="vdiv">V / div</label>
-                <select id="vdiv">
-                    <option value="5">5 V/div</option>
-                    <option value="2">2 V/div</option>
-                    <option value="1" selected>1 V/div</option>
-                    <option value="0.5">0,5 V/div</option>
-                    <option value="0.2">0,2 V/div</option>
-                    <option value="0.1">0,1 V/div</option>
-                    <option value="0.05">50 mV/div</option>
-                    <option value="0.02">20 mV/div</option>
-                    <option value="0.01">10 mV/div</option>
-                    <option value="0.005">5 mV/div</option>
-                    <option value="0.002">2 mV/div</option>
-                    <option value="0.001">1 mV/div</option>
-                </select>
+            <!-- KNOBS (rotatifs) -->
+            <div class="knob" id="knobV" aria-label="V/div">
+                <div class="value" id="vdivVal">1 V/div</div>
+                <div class="needle" id="vNeedle"></div>
+                <div class="cap"></div>
             </div>
-
-            <div class="hotspot" id="tdiv-hotspot">
-                <label for="tdiv">sec / div</label>
-                <select id="tdiv">
-                    <option value="0.5">0,5 s/div</option>
-                    <option value="0.2">0,2 s/div</option>
-                    <option value="0.1">0,1 s/div</option>
-                    <option value="0.05">50 ms/div</option>
-                    <option value="0.02">20 ms/div</option>
-                    <option value="0.01">10 ms/div</option>
-                    <option value="0.005">5 ms/div</option>
-                    <option value="0.002">2 ms/div</option>
-                    <option value="0.001">1 ms/div</option>
-                    <option value="0.0005">0,5 ms/div</option>
-                    <option value="0.0002">0,2 ms/div</option>
-                    <option value="0.0001">0,1 ms/div</option>
-                </select>
+            <div class="knob" id="knobT" aria-label="sec/div">
+                <div class="value" id="tdivVal">2 ms/div</div>
+                <div class="needle" id="tNeedle"></div>
+                <div class="cap"></div>
             </div>
 
             <!-- Paramètres d'entrée -->
@@ -222,46 +223,69 @@
     <script>
         // --- constantes ---
         const DIV_X = 10, DIV_Y = 8;
-        const CENTER_TWEAK_PX = -2;   // remonte un chouïa (ajuste à -1 ou -3 si besoin)
+        const CENTER_TWEAK_PX = -2; // remonte subtilement la trace pour coïncider au centre visuel
+
+        // Calibres (dans l'ordre correspondant au sens horaire du bouton)
+        const VDIV_STEPS = [5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001];
+        const TDIV_STEPS = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001];
+
+        // Angles de rotation (style knob : -135° → +135°)
+        const MIN_ANGLE = 0, MAX_ANGLE = 330;
 
         const cvs = document.getElementById('trace');
         const ctx = cvs.getContext('2d');
 
-        // UI
+        // UI signal
         const ui = {
             wave: document.getElementById('wave'),
             freq: document.getElementById('freq'),
             amp: document.getElementById('amp'),
             offset: document.getElementById('offset'),
             cycles: document.getElementById('cycles'),
-            vdiv: document.getElementById('vdiv'),
-            tdiv: document.getElementById('tdiv'),
             reset: document.getElementById('reset')
         };
+
+        // Knobs
+        const knobV = document.getElementById('knobV');
+        const knobT = document.getElementById('knobT');
+        const vNeedle = document.getElementById('vNeedle');
+        const tNeedle = document.getElementById('tNeedle');
+        const vLabel = document.getElementById('vdivVal');
+        const tLabel = document.getElementById('tdivVal');
+
+        // Indices de départ (1 V/div ; 2 ms/div)
+        let vIndex = VDIV_STEPS.indexOf(1);
+        let tIndex = TDIV_STEPS.indexOf(0.002);
 
         // Position verticale de la trace (0 au centre)
         let yCenterDiv = DIV_Y / 2;
         ui.reset.addEventListener('click', () => { yCenterDiv = DIV_Y / 2; draw(); });
 
-        // Canvas = taille CSS × DPR
+        // Utils
+        const fmtV = v => (v >= 1 ? `${v} V/div` : (v >= 0.001 ? `${v} V/div` : `${v * 1000} mV/div`));
+        const fmtT = s => {
+            if (s >= 1) return `${s} s/div`;
+            if (s >= 0.001) return `${s * 1000} ms/div`;
+            return `${s * 1e6} µs/div`;
+        };
+
+        function stepAngle(list, idx) { return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (idx / (list.length - 1)); }
+        function setNeedle(needle, list, idx) { needle.style.transform = `translate(-50%,-100%) rotate(${stepAngle(list, idx)}deg)`; }
+
         function resizeCanvasToCSS() {
             const rect = cvs.getBoundingClientRect();
-            if (rect.width < 2 || rect.height < 2) return false; // layout pas prêt
+            if (rect.width < 2 || rect.height < 2) return false;
             const dpr = window.devicePixelRatio || 1;
             cvs.width = Math.round(rect.width * dpr);
             cvs.height = Math.round(rect.height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // dessiner en unités CSS
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             return true;
         }
 
-        // Génère des points échantillonnés sur la largeur visible
-        function generateSamples() {
+        function generateSamples(vPerDiv, sPerDiv) {
             const w = Math.max(2, cvs.getBoundingClientRect().width);
 
-            const vPerDiv = parseFloat(ui.vdiv.value); // V/div
-            const sPerDiv = parseFloat(ui.tdiv.value); // s/div
             const secTotal = sPerDiv * DIV_X;          // 10 divisions à l'écran
-
             const f = Math.max(0.000001, parseFloat(ui.freq.value));
             const A = Math.abs(parseFloat(ui.amp.value));
             const DC = parseFloat(ui.offset.value);
@@ -269,8 +293,7 @@
             const stepT = secTotal / (w - 1);
             const pts = [];
             for (let x = 0; x < w; x++) {
-                // Centrage temporel : t = 0 au milieu de l'écran
-                const t = (x * stepT) - (secTotal / 2);
+                const t = (x * stepT) - (secTotal / 2); // centré
                 let y = 0;
                 const ph = 2 * Math.PI * f * t;
                 switch (ui.wave.value) {
@@ -295,11 +318,14 @@
             const rect = cvs.getBoundingClientRect();
             const W = rect.width, H = rect.height;
 
-            const { pts, vPerDiv, DC } = generateSamples();
+            const vPerDiv = VDIV_STEPS[vIndex];
+            const sPerDiv = TDIV_STEPS[tIndex];
+
+            const { pts, DC } = generateSamples(vPerDiv, sPerDiv);
 
             // Échelles
             const pxPerDivY = H / DIV_Y;
-            const centerY = yCenterDiv * pxPerDivY + CENTER_TWEAK_PX;   // 0 V si offset = 0
+            const centerY = yCenterDiv * pxPerDivY + CENTER_TWEAK_PX;
             const pxPerVolt = pxPerDivY / vPerDiv;
 
             // Nettoyage
@@ -313,9 +339,9 @@
             ctx.moveTo(0, yDC); ctx.lineTo(W, yDC);
             ctx.stroke();
 
-            // Trace verte épaissie (type oscillo 80s)
-            ctx.lineWidth = 4;           // ≈ ×3
-            ctx.strokeStyle = '#0a7d2c'; // vert foncé
+            // Trace verte (un peu plus fine que précédemment)
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#0a7d2c';
             ctx.beginPath();
             for (let i = 0; i < pts.length; i++) {
                 const p = pts[i];
@@ -325,6 +351,69 @@
             }
             ctx.stroke();
         }
+
+        // ---- KNOB INTERACTION (souris + tactile) ----
+        function attachKnob(el, list, getIdx, setIdx, labelEl, fmt, needleEl) {
+            let dragging = false;
+
+            function updateLabel() {
+                labelEl.textContent = fmt(list[getIdx()]);
+                setNeedle(needleEl, list, getIdx());
+                draw();
+            }
+
+            function angleFromEvent(e) {
+                const r = el.getBoundingClientRect();
+                const cx = r.left + r.width / 2;
+                const cy = r.top + r.height / 2;
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
+                let ang = Math.atan2(y, x) * 180 / Math.PI; // -180..180 (0° = +x)
+                // Convertir pour que 0° soit en haut et angle croisse dans le sens horaire
+                ang = 90 + ang;
+                // Normaliser -180..180
+                if (ang > 180) ang -= 360;
+                return Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, ang));
+            }
+
+            function idxFromAngle(ang) {
+                const ratio = (ang - MIN_ANGLE) / (MAX_ANGLE - MIN_ANGLE); // 0..1
+                const idx = Math.round(ratio * (list.length - 1));
+                return Math.max(0, Math.min(list.length - 1, idx));
+            }
+
+            function onDown(e) { dragging = true; e.preventDefault(); el.setPointerCapture?.(e.pointerId); onMove(e); }
+            function onMove(e) {
+                if (!dragging) return;
+                const ang = angleFromEvent(e);
+                const idx = idxFromAngle(ang);
+                if (idx !== getIdx()) { setIdx(idx); updateLabel(); }
+            }
+            function onUp() { dragging = false; }
+
+            // Souris
+            el.addEventListener('mousedown', onDown);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+            // Tactile
+            el.addEventListener('touchstart', onDown, { passive: false });
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('touchend', onUp);
+
+            // init visuelle
+            updateLabel();
+        }
+
+        attachKnob(
+            knobV, VDIV_STEPS,
+            () => vIndex, (i) => { vIndex = i; },
+            vLabel, fmtV, vNeedle
+        );
+        attachKnob(
+            knobT, TDIV_STEPS,
+            () => tIndex, (i) => { tIndex = i; },
+            tLabel, fmtT, tNeedle
+        );
 
         // ---- INIT robuste : attendre l'image + redraw sur changements de taille ----
         const bg = document.getElementById('bg');
@@ -337,10 +426,8 @@
         }
         if (bg.complete) init(); else bg.addEventListener('load', init, { once: true });
 
-        // Sécurité : on redessine aussi au resize fenêtre
+        // Sécurité : on redessine aussi au resize fenêtre + changements des paramètres
         window.addEventListener('resize', draw);
-
-        // Écoute des contrôles
         ['change', 'input'].forEach(ev => {
             Object.values(ui).forEach(el => el && el.addEventListener(ev, draw));
         });
