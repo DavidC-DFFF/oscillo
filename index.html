@@ -10,10 +10,13 @@
 
 <body>
     <div class="app">
-        <!-- PANNEAU LATERAL -->
+        <!-- ESPACE (col 1) -->
+
+        <!-- BARRE (col 2) -->
         <aside class="sidebar">
             <form class="sidepanel" id="controls">
                 <h2>Entrée</h2>
+
                 <label>Forme
                     <select id="wave">
                         <option value="sine">Sinusoïdal</option>
@@ -21,29 +24,51 @@
                         <option value="triangle">Triangle</option>
                     </select>
                 </label>
+
+                <label>Rapport cyclique (%)</label>
+                <div class="duty-row">
+                    <input id="duty" type="range" min="5" max="95" step="1" value="50">
+                    <input id="dutyNum" type="number" min="5" max="95" step="1" value="50"
+                        aria-label="Rapport cyclique (pourcent)">
+                </div>
+
                 <label>Amplitude crête (V)
                     <input id="amp" type="number" min="0" step="0.01" value="2" />
                 </label>
+
                 <label>Décalage DC (V)
                     <input id="offset" type="number" step="0.01" value="0" />
                 </label>
+
                 <label>Fréquence (Hz)
                     <input id="freq" type="number" min="0.000001" step="0.01" value="50" />
                 </label>
+
                 <label>Période (s)
                     <input id="per" type="number" min="0.000001" step="0.000001" value="" placeholder="auto" />
                 </label>
-                <button type="button" id="exportPng">Exporter PNG (écran)</button>
+
+                <label class="inline">
+                    <input id="showDC" type="checkbox" checked>
+                    Afficher la ligne DC
+                </label>
+
+                <button type="button" id="exportPng">Exporter PNG (oscilloscope complet)</button>
             </form>
         </aside>
 
-        <!-- OSCILLOSCOPE -->
+        <!-- ESPACE (col 3) -->
+
+        <!-- OSCILLO (col 4) -->
         <div class="wrap">
             <div class="scope" id="scope">
-                <img id="bg" src="Oscilloscope.png" alt="Oscilloscope pédagogique" />
+                <img id="bg" src="Oscilloscope3.png" alt="Oscilloscope pédagogique" />
                 <canvas id="trace" width="800" height="600" aria-hidden="true"></canvas>
 
-                <!-- KNOBS -->
+                <!-- Bouton de décalage horizontal (drag horizontal) -->
+                <div id="hShift" class="hshift" title="Décalage horizontal (glisser)"></div>
+
+                <!-- Knobs (bulles masquées via CSS) -->
                 <div class="knob" id="knobV" aria-label="V/div">
                     <div class="value" id="vdivVal">1 V/div</div>
                     <div class="needle" id="vNeedle"></div>
@@ -56,6 +81,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- ESPACE (col 5) -->
     </div>
 
     <script src="./script.js" defer></script>

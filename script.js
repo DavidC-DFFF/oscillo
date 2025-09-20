@@ -2,6 +2,8 @@
 const DIV_X = 10, DIV_Y = 8;
 const CENTER_TWEAK_PX = -2;
 
+const TIME_SCALE_CORR = 1.039; // facteur de correction horizontale
+
 const VDIV_STEPS = [5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001];
 const TDIV_STEPS = [0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001];
 
@@ -13,14 +15,29 @@ const ctx = cvs.getContext('2d');
 
 const ui = {
     wave: document.getElementById('wave'),
+    duty: document.getElementById('duty'),
+    dutyNum: document.getElementById('dutyNum'),
     freq: document.getElementById('freq'),
     per: document.getElementById('per'),
     amp: document.getElementById('amp'),
     offset: document.getElementById('offset'),
+    showDC: document.getElementById('showDC'),
     exportPng: document.getElementById('exportPng')
 };
 
-let yCenterDiv = DIV_Y / 2;
+// Centres en divisions (0..DIV_X/Y)
+let yCenterDiv = DIV_Y / 2;     // vertical
+let xCenterDiv = DIV_X / 2;     // horizontal (décalage)
+
+// ------ helpers ------
+// Lecture nombre robuste (gère valueAsNumber + virgule FR)
+function readNum(inputEl, fallback = 0) {
+    const raw = String(inputEl?.value ?? '');
+    const n = inputEl && Number.isFinite(inputEl.valueAsNumber)
+        ? inputEl.valueAsNumber
+        : parseFloat(raw.replace(',', '.'));
+    return Number.isFinite(n) ? n : fallback;
+}
 
 function resizeCanvasToCSS() {
     const rect = cvs.getBoundingClientRect();
@@ -32,22 +49,38 @@ function resizeCanvasToCSS() {
     return true;
 }
 
+// Génération des échantillons (intègre le rapport cyclique pour carré + décalage horizontal)
 function generateSamples(vPerDiv, sPerDiv) {
     const w = Math.max(2, cvs.getBoundingClientRect().width);
-    const secTotal = sPerDiv * DIV_X;
-    const f = Math.max(0.000001, parseFloat(ui.freq.value));
-    const A = Math.abs(parseFloat(ui.amp.value));
-    const DC = parseFloat(ui.offset.value);
+    const secTotal = sPerDiv * DIV_X * TIME_SCALE_CORR;
+
+    const f = Math.max(0.000001, readNum(ui.freq, 50));
+    const A = Math.abs(readNum(ui.amp, 2));
+    const DC = readNum(ui.offset, 0);
+
+    // On prend la valeur du champ numérique comme source
+    const dutyRatio = Math.max(0.05, Math.min(0.95, (readNum(ui.dutyNum, 50)) / 100));
 
     const stepT = secTotal / (w - 1);
+    const tOffset = xCenterDiv * sPerDiv; // décalage temporel commandé par le bouton horizontal
+
     const pts = [];
     for (let x = 0; x < w; x++) {
-        const t = (x * stepT) - (secTotal / 2);
+        const t = (x * stepT) - tOffset;   // centré par xCenterDiv (au centre: t≈0)
         let y = 0;
-        const ph = 2 * Math.PI * f * t;
+
         switch (ui.wave.value) {
-            case 'sine': y = A * Math.sin(ph); break;
-            case 'square': y = (Math.sin(ph) >= 0 ? A : -A); break;
+            case 'sine': {
+                y = A * Math.sin(2 * Math.PI * f * t);
+                break;
+            }
+            case 'square': {
+                const T = 1 / f;
+                let frac = (t / T) - Math.floor(t / T);
+                if (frac < 0) frac += 1;
+                y = (frac < dutyRatio) ? A : -A;
+                break;
+            }
             case 'triangle': {
                 const T = 1 / f;
                 const frac = (t / T) - Math.floor(t / T + 0.5);
@@ -55,6 +88,7 @@ function generateSamples(vPerDiv, sPerDiv) {
                 break;
             }
         }
+
         y += DC;
         pts.push({ x, y });
     }
@@ -78,9 +112,9 @@ function draw() {
 
     ctx.clearRect(0, 0, W, H);
 
-    // Ligne DC si utile
+    // Ligne DC : contrôlée par la case à cocher
     const EPS_V = 1e-6;
-    if (Math.abs(DC) > EPS_V) {
+    if (ui.showDC.checked && Math.abs(DC) > EPS_V) {
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#d11';
         ctx.beginPath();
@@ -102,50 +136,27 @@ function draw() {
     ctx.stroke();
 }
 
-// -------- KNOBS --------
+// -------- KNOBS (V/div & s/div) --------
 const MIN_ANGLE = 0, MAX_ANGLE = 330;
-function stepAngle(list, idx) {
-    return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (idx / (list.length - 1));
-}
-function setNeedle(needle, list, idx) {
-    const deg = stepAngle(list, idx);
-    needle.style.transform = `translate(-50%,-100%) rotate(${deg}deg)`;
-}
-function polarAngleCWdeg(x, y) {
-    let a = Math.atan2(y, x) * 180 / Math.PI;
-    a = (a + 450) % 360;
-    return a;
-}
+function stepAngle(list, idx) { return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (idx / (list.length - 1)); }
+function setNeedle(needle, list, idx) { needle.style.transform = `translate(-50%,-100%) rotate(${stepAngle(list, idx)}deg)`; }
+function polarAngleCWdeg(x, y) { let a = Math.atan2(y, x) * 180 / Math.PI; return (a + 450) % 360; }
 function angleFromEvent(e, el) {
     const r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const ex = (e.touches ? e.touches[0].clientX : e.clientX) - cx;
     const ey = (e.touches ? e.touches[0].clientY : e.clientY) - cy;
-    let ang = polarAngleCWdeg(ex, ey);
-    ang = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, ang));
-    return ang;
+    return Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, polarAngleCWdeg(ex, ey)));
 }
-function idxFromAngle(ang, list) {
-    const ratio = (ang - MIN_ANGLE) / (MAX_ANGLE - MIN_ANGLE);
-    return Math.max(0, Math.min(list.length - 1, Math.round(ratio * (list.length - 1))));
-}
+function idxFromAngle(ang, list) { const ratio = (ang - MIN_ANGLE) / (MAX_ANGLE - MIN_ANGLE); return Math.max(0, Math.min(list.length - 1, Math.round(ratio * (list.length - 1)))); }
 
 const vNeedle = document.getElementById('vNeedle');
 const tNeedle = document.getElementById('tNeedle');
 const vLabel = document.getElementById('vdivVal');
 const tLabel = document.getElementById('tdivVal');
 
-function fmtV(v) {
-    if (v >= 1) return `${v} V/div`;
-    if (v >= 1e-3) return `${v * 1e3} mV/div`;
-    return `${v * 1e6} µV/div`;
-}
-function fmtT(s) {
-    if (s >= 1) return `${s} s/div`;
-    if (s >= 0.001) return `${s * 1000} ms/div`;
-    return `${s * 1e6} µs/div`;
-}
+function fmtV(v) { return v >= 1 ? `${v} V/div` : (v >= 1e-3 ? `${v * 1e3} mV/div` : `${v * 1e6} µV/div`); }
+function fmtT(s) { if (s >= 1) return `${s} s/div`; if (s >= 1e-3) return `${s * 1e3} ms/div`; return `${s * 1e6} µs/div`; }
 
 function attachKnobDrag(el, list, getIdx, setIdx, labelEl, fmt, needleEl) {
     let dragging = false;
@@ -153,49 +164,32 @@ function attachKnobDrag(el, list, getIdx, setIdx, labelEl, fmt, needleEl) {
         const idx = Math.max(0, Math.min(list.length - 1, i));
         if (idx !== getIdx()) {
             setIdx(idx);
-            labelEl.textContent = fmt(list[idx]);
+            if (labelEl) labelEl.textContent = fmt(list[idx]); // bulles masquées via CSS, mais on met à jour
             setNeedle(needleEl, list, idx);
             draw();
         }
     }
     function onDown(e) { dragging = true; e.preventDefault(); onMove(e); }
-    function onMove(e) {
-        if (!dragging) return;
-        e.preventDefault();
-        const ang = angleFromEvent(e, el);
-        const idx = idxFromAngle(ang, list);
-        applyIndex(idx);
-    }
+    function onMove(e) { if (!dragging) return; e.preventDefault(); const ang = angleFromEvent(e, el); applyIndex(idxFromAngle(ang, list)); }
     function onUp() { dragging = false; }
-
     el.addEventListener('mousedown', onDown);
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     el.addEventListener('touchstart', onDown, { passive: false });
     window.addEventListener('touchmove', onMove, { passive: false });
     window.addEventListener('touchend', onUp);
-
-    labelEl.textContent = fmt(list[getIdx()]);
+    if (labelEl) labelEl.textContent = fmt(list[getIdx()]);
     setNeedle(needleEl, list, getIdx());
 }
+attachKnobDrag(document.getElementById('knobV'), VDIV_STEPS, () => vIndex, (i) => { vIndex = i; }, vLabel, fmtV, vNeedle);
+attachKnobDrag(document.getElementById('knobT'), TDIV_STEPS, () => tIndex, (i) => { tIndex = i; }, tLabel, fmtT, tNeedle);
 
-attachKnobDrag(
-    document.getElementById('knobV'), VDIV_STEPS,
-    () => vIndex, (i) => { vIndex = i; },
-    vLabel, fmtV, vNeedle
-);
-attachKnobDrag(
-    document.getElementById('knobT'), TDIV_STEPS,
-    () => tIndex, (i) => { tIndex = i; },
-    tLabel, fmtT, tNeedle
-);
-
-// ---- Période <-> Fréquence
+// ---- Période <-> Fréquence (robuste à la virgule) ----
 let syncingFP = false;
 function setFreqFromPer() {
     if (syncingFP) return;
-    const P = parseFloat(ui.per.value);
-    if (!isFinite(P) || P <= 0) return;
+    const P = readNum(ui.per);
+    if (!(P > 0)) return;
     syncingFP = true;
     ui.freq.value = (1 / P).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
     syncingFP = false;
@@ -203,8 +197,8 @@ function setFreqFromPer() {
 }
 function setPerFromFreq() {
     if (syncingFP) return;
-    const f = parseFloat(ui.freq.value);
-    if (!isFinite(f) || f <= 0) return;
+    const f = readNum(ui.freq);
+    if (!(f > 0)) return;
     syncingFP = true;
     ui.per.value = (1 / f).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
     syncingFP = false;
@@ -216,7 +210,32 @@ ui.freq.addEventListener('change', setPerFromFreq);
 ui.per.addEventListener('input', setFreqFromPer);
 ui.per.addEventListener('change', setFreqFromPer);
 
-// ---- Pan vertical à la molette + clic droit = recentrer
+// ---- Slider/Number de rapport cyclique (sync + activation selon forme) ----
+function syncDuty(fromRange) {
+    if (fromRange) {
+        ui.dutyNum.value = ui.duty.value;
+    } else {
+        const v = Math.max(5, Math.min(95, Math.round(readNum(ui.dutyNum, 50))));
+        ui.dutyNum.value = String(v);
+        ui.duty.value = String(v);
+    }
+    draw();
+}
+ui.duty.addEventListener('input', () => syncDuty(true));
+ui.dutyNum.addEventListener('input', () => syncDuty(false));
+
+function updateDutyState() {
+    const isSquare = ui.wave.value === 'square';
+    ui.duty.disabled = !isSquare;
+    ui.dutyNum.disabled = !isSquare;
+}
+updateDutyState();
+ui.wave.addEventListener('change', () => { updateDutyState(); draw(); });
+
+// ---- Afficher/masquer la ligne DC ----
+ui.showDC.addEventListener('change', draw);
+
+// ---- Pan vertical à la molette + clic droit = recentrer verticalement
 cvs.addEventListener('wheel', (e) => {
     e.preventDefault();
     const deltaDiv = (e.deltaY > 0 ? 0.2 : -0.2);
@@ -225,42 +244,79 @@ cvs.addEventListener('wheel', (e) => {
 }, { passive: false });
 cvs.addEventListener('contextmenu', (e) => { e.preventDefault(); yCenterDiv = DIV_Y / 2; draw(); });
 
-// ---- Export PNG (écran de l’oscillo)
-function exportScreenPNG() {
-    const bg = document.getElementById('bg');
-    const trace = document.getElementById('trace');
+// ---- Décalage horizontal via le bouton "hShift" (drag horizontal)
+(function () {
+    const h = document.getElementById('hShift');
+    if (!h) return; // sécurité si le bouton n'est pas présent
+    let dragging = false, startX = 0, startCenter = DIV_X / 2;
 
+    function onDown(e) {
+        dragging = true;
+        startX = (e.touches ? e.touches[0].clientX : e.clientX);
+        startCenter = xCenterDiv;
+        e.preventDefault();
+    }
+    function onMove(e) {
+        if (!dragging) return;
+        const rect = cvs.getBoundingClientRect();
+        const pxPerDivX = rect.width / DIV_X;
+        const clientX = (e.touches ? e.touches[0].clientX : e.clientX);
+        const dx = clientX - startX;
+        const deltaDiv = dx / pxPerDivX;
+        xCenterDiv = Math.max(0, Math.min(DIV_X, startCenter + deltaDiv));
+        draw();
+        e.preventDefault();
+    }
+    function onUp() { dragging = false; }
+
+    // Double-clic = recentre horizontalement
+    h.addEventListener('dblclick', () => { xCenterDiv = DIV_X / 2; draw(); });
+
+    h.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+
+    h.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+})();
+
+// ---- Export PNG (oscilloscope COMPLET) ----
+function exportFullPNG() {
+    const bg = document.getElementById('bg');
+
+    // Canvas de sortie à la taille native de l'image d'oscilloscope
+    const out = document.createElement('canvas');
+    out.width = bg.naturalWidth;
+    out.height = bg.naturalHeight;
+    const octx = out.getContext('2d');
+
+    // 1) Dessiner l'image complète
+    octx.drawImage(bg, 0, 0, out.width, out.height);
+
+    // 2) Dessiner la trace dans la zone écran
     const css = getComputedStyle(document.documentElement);
     const leftPct = parseFloat(css.getPropertyValue('--screen-left'));
     const topPct = parseFloat(css.getPropertyValue('--screen-top'));
     const wPct = parseFloat(css.getPropertyValue('--screen-width'));
     const hPct = parseFloat(css.getPropertyValue('--screen-height'));
 
-    const nW = bg.naturalWidth, nH = bg.naturalHeight;
-    const sx = Math.round(nW * leftPct / 100);
-    const sy = Math.round(nH * topPct / 100);
-    const sW = Math.round(nW * wPct / 100);
-    const sH = Math.round(nH * hPct / 100);
+    const sx = Math.round(out.width * leftPct / 100);
+    const sy = Math.round(out.height * topPct / 100);
+    const sW = Math.round(out.width * wPct / 100);
+    const sH = Math.round(out.height * hPct / 100);
 
-    const off = document.createElement('canvas');
-    off.width = sW; off.height = sH;
-    const octx = off.getContext('2d');
+    octx.drawImage(cvs, 0, 0, cvs.width, cvs.height, sx, sy, sW, sH);
 
-    // Fond (grille de l'écran)
-    octx.drawImage(bg, sx, sy, sW, sH, 0, 0, sW, sH);
-    // Trace (scalée à la même taille)
-    octx.drawImage(trace, 0, 0, trace.width, trace.height, 0, 0, sW, sH);
-
+    // 3) Télécharger
     const a = document.createElement('a');
-    a.href = off.toDataURL('image/png');
-    a.download = `oscilloscope_ecran.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = out.toDataURL('image/png');
+    a.download = `oscilloscope_complet.png`;
+    document.body.appendChild(a); a.click(); a.remove();
 }
-ui.exportPng.addEventListener('click', exportScreenPNG);
+ui.exportPng.addEventListener('click', exportFullPNG);
 
-// ---- INIT
+// ---- INIT ----
 const bg = document.getElementById('bg');
 const ro = new ResizeObserver(() => draw());
 function init() {
@@ -274,3 +330,13 @@ window.addEventListener('resize', draw);
 ['change', 'input'].forEach(ev => {
     [ui.wave, ui.freq, ui.per, ui.amp, ui.offset].forEach(el => el && el.addEventListener(ev, draw));
 });
+
+// (Optionnel) Aide au calage des positions en % sur l'image (log dans la console)
+
+document.getElementById('scope').addEventListener('click', (e)=>{
+  const r = e.currentTarget.getBoundingClientRect();
+  const xPct = ((e.clientX - r.left) / r.width) * 100;
+  const yPct = ((e.clientY - r.top)  / r.height) * 100;
+  console.log(`--left: ${xPct.toFixed(1)}%;  --top: ${yPct.toFixed(1)}%;`);
+});
+
