@@ -4,7 +4,7 @@
     --screen-top: 17.7%;
     --screen-width: 55.45%;
     --screen-height: 65.7%;
-    /* Centres visuels des boutons (mesures) */
+    /* Centres visuels des boutons */
     --knob-v-left: 85.9%;
     --knob-v-top: 33.9%;
     --knob-t-left: 85.9%;
@@ -37,7 +37,7 @@ body {
     min-height: 100%;
 }
 
-/* Toujours ENTIER dans l’écran (image ~1116×768 ⇒ ratio ≈ 1.454) */
+/* Image oscillo entière (ratio ≈ 1.454) */
 .scope {
     position: relative;
     width: min(96vw, calc(96vh * 1.454));
@@ -54,7 +54,7 @@ body {
     -webkit-user-drag: none;
 }
 
-/* Canvas exactement à la taille de l'écran quadrillé */
+/* Canvas exactement à la zone de l'écran quadrillé */
 #trace {
     position: absolute;
     left: var(--screen-left);
