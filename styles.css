@@ -1,94 +1,37 @@
-:root {
-    /* Zone écran (en %) repérée sur l'image */
-    --screen-left: 10.91%;
-    --screen-top: 17.7%;
-    --screen-width: 55.45%;
-    --screen-height: 65.7%;
-    /* Centres visuels des boutons */
-    --knob-v-left: 85.9%;
-    --knob-v-top: 33.9%;
-    --knob-t-left: 85.9%;
-    --knob-t-top: 74.4%;
-}
-
-html,
-body {
-    height: 100%;
-    margin: 0;
-    background: #0e0f12;
-    color: #111;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-}
-
-/* Layout global : panneau à gauche, oscillo à droite */
+/* 1) Colonne + centrage vertical sur l’oscillo */
 .app {
     display: grid;
-    grid-template-columns: minmax(220px, 260px) 1fr;
+    /* barre plus étroite */
+    grid-template-columns: minmax(150px, 200px) 1fr;
     gap: 16px;
     min-height: 100vh;
-    align-items: start;
+    /* centre verticalement les 2 colonnes entre elles */
+    align-items: center;
     padding: 12px;
 }
 
-/* Colonne de droite (oscillo) */
-.wrap {
-    display: grid;
-    place-items: center;
-    min-height: 100%;
-}
-
-/* Image oscillo entière (ratio ≈ 1.454) */
-.scope {
-    position: relative;
-    width: min(96vw, calc(96vh * 1.454));
-    max-width: 1400px;
-    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .35));
-}
-
-.scope img {
-    width: 100%;
-    height: auto;
-    display: block;
-    border-radius: 10px;
-    user-select: none;
-    -webkit-user-drag: none;
-}
-
-/* Canvas exactement à la zone de l'écran quadrillé */
-#trace {
-    position: absolute;
-    left: var(--screen-left);
-    top: var(--screen-top);
-    width: var(--screen-width);
-    height: var(--screen-height);
-    pointer-events: none;
-}
-
-/* Panneau latéral fin */
+/* 2) Barre latérale centrée verticalement (retire le sticky) */
 .sidebar {
-    position: sticky;
-    top: 12px;
-    align-self: start;
+    align-self: center;
 }
 
+/* 3) Panneau : largeur maîtrisée et contrôles 100% */
 .sidepanel {
     display: grid;
     gap: 10px;
     background: rgba(255, 255, 255, .96);
     border: 1px solid #e2e5ec;
     border-radius: 14px;
-    padding: 12px 14px;
+    padding: 12px;
     width: 100%;
+    max-width: 200px;
+    /* sécurité anti-débordement */
+    box-sizing: border-box;
+    /* inclure padding/bordures dans la largeur */
     backdrop-filter: blur(4px);
 }
 
-.sidepanel h2 {
-    margin: 0 0 6px;
-    font-size: 14px;
-    letter-spacing: .02em;
-    color: #333;
-}
-
+/* Même largeur, pas de dépassement, cohérence visuelle */
 .sidepanel label {
     display: grid;
     gap: 6px;
@@ -97,22 +40,20 @@ body {
 }
 
 .sidepanel input,
-.sidepanel select {
-    width: 100%;
-    padding: 6px 8px;
-    font-size: 14px;
-    border: 1px solid #c9ccd3;
-    border-radius: 8px;
-    background: #fff;
-}
-
+.sidepanel select,
 .sidepanel button {
-    margin-top: 6px;
+    width: 100%;
+    max-width: 100%;
     padding: 8px 10px;
+    /* même padding pour tous */
     font-size: 14px;
     border: 1px solid #c9ccd3;
     border-radius: 10px;
     background: #fff;
+    box-sizing: border-box;
+}
+
+.sidepanel button {
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
 }
@@ -121,68 +62,9 @@ body {
     background: #f6f7fb;
 }
 
-/* --- KNOBS (boutons rotatifs) --- */
-.knob {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: clamp(90px, 12vw, 150px);
-    height: clamp(90px, 12vw, 150px);
-    border-radius: 50%;
-    cursor: grab;
-    z-index: 8;
-}
-
-.knob:active {
-    cursor: grabbing;
-}
-
-.knob .needle {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -100%) rotate(0deg);
-    width: 4px;
-    height: 45%;
-    background: #111;
-    border-radius: 4px;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, .8), 0 1px 4px rgba(0, 0, 0, .3);
-    transform-origin: 50% 100%;
-}
-
-.knob .cap {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 18%;
-    height: 18%;
-    border-radius: 50%;
-    background: #e9e7df;
-    border: 1px solid rgba(0, 0, 0, .25);
-    box-shadow: inset 0 2px 3px rgba(0, 0, 0, .2);
-}
-
-.knob .value {
-    position: absolute;
-    left: 50%;
-    top: -10px;
-    transform: translate(-50%, -100%);
-    font-size: 12px;
-    background: #fff;
-    border: 1px solid #c9ccd3;
-    border-radius: 10px;
-    padding: 4px 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
-    white-space: nowrap;
-    user-select: none;
-}
-
-#knobV {
-    left: var(--knob-v-left);
-    top: var(--knob-v-top);
-}
-
-#knobT {
-    left: var(--knob-t-left);
-    top: var(--knob-t-top);
+/* 4) L’oscillo reste tel quel; on garde le centrage dans sa colonne */
+.wrap {
+    display: grid;
+    place-items: center;
+    min-height: 100%;
 }
