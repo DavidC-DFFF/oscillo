@@ -283,37 +283,88 @@ cvs.addEventListener('contextmenu', (e) => { e.preventDefault(); yCenterDiv = DI
 
 // ---- Export PNG (oscilloscope COMPLET) ----
 function exportFullPNG() {
-    const bg = document.getElementById('bg');
+  const bg = document.getElementById('bg');
+  const scopeEl = document.getElementById('scope');
 
-    // Canvas de sortie à la taille native de l'image d'oscilloscope
-    const out = document.createElement('canvas');
-    out.width = bg.naturalWidth;
-    out.height = bg.naturalHeight;
-    const octx = out.getContext('2d');
+  // Canvas de sortie à la taille native du PNG
+  const out = document.createElement('canvas');
+  out.width = bg.naturalWidth;
+  out.height = bg.naturalHeight;
+  const octx = out.getContext('2d');
 
-    // 1) Dessiner l'image complète
-    octx.drawImage(bg, 0, 0, out.width, out.height);
+  // 1) Fond
+  octx.drawImage(bg, 0, 0, out.width, out.height);
 
-    // 2) Dessiner la trace dans la zone écran
-    const css = getComputedStyle(document.documentElement);
-    const leftPct = parseFloat(css.getPropertyValue('--screen-left'));
-    const topPct = parseFloat(css.getPropertyValue('--screen-top'));
-    const wPct = parseFloat(css.getPropertyValue('--screen-width'));
-    const hPct = parseFloat(css.getPropertyValue('--screen-height'));
+  // 2) Trace dans la zone écran (utilise les variables CSS)
+  const css = getComputedStyle(document.documentElement);
+  const leftPct = parseFloat(css.getPropertyValue('--screen-left'));
+  const topPct  = parseFloat(css.getPropertyValue('--screen-top'));
+  const wPct    = parseFloat(css.getPropertyValue('--screen-width'));
+  const hPct    = parseFloat(css.getPropertyValue('--screen-height'));
 
-    const sx = Math.round(out.width * leftPct / 100);
-    const sy = Math.round(out.height * topPct / 100);
-    const sW = Math.round(out.width * wPct / 100);
-    const sH = Math.round(out.height * hPct / 100);
+  const sx = Math.round(out.width  * leftPct / 100);
+  const sy = Math.round(out.height * topPct  / 100);
+  const sW = Math.round(out.width  * wPct   / 100);
+  const sH = Math.round(out.height * hPct   / 100);
 
-    octx.drawImage(cvs, 0, 0, cvs.width, cvs.height, sx, sy, sW, sH);
+  octx.drawImage(cvs, 0, 0, cvs.width, cvs.height, sx, sy, sW, sH);
 
-    // 3) Télécharger
-    const a = document.createElement('a');
-    a.href = out.toDataURL('image/png');
-    a.download = `oscilloscope_complet.png`;
-    document.body.appendChild(a); a.click(); a.remove();
+  // ---------- 3) Aiguilles des knobs (V/div & sec/div) ----------
+  // On mesure les éléments overlay à l'écran, puis on les projette à l'échelle du PNG.
+  const bgRect    = bg.getBoundingClientRect();
+  const kVRect    = document.getElementById('knobV').getBoundingClientRect();
+  const kTRect    = document.getElementById('knobT').getBoundingClientRect();
+
+  const scaleX = out.width  / bgRect.width;
+  const scaleY = out.height / bgRect.height;
+  const scaleA = (scaleX + scaleY) / 2; // échelle moyenne pour les largeurs de trait
+
+  function drawNeedleFromRect(r, angleDeg) {
+    // centre du knob dans l'image exportée
+    const cx = ( (r.left - bgRect.left) + r.width  / 2 ) * scaleX;
+    const cy = ( (r.top  - bgRect.top ) + r.height / 2 ) * scaleY;
+
+    // longueur ≈ 45% du diamètre visuel du knob
+    const len = (Math.min(r.width * scaleX, r.height * scaleY)) * 0.45;
+
+    // angle 0° = vers le haut, sens horaire (comme en CSS)
+    const th = angleDeg * Math.PI / 180;
+    const x2 = cx + Math.sin(th) * len;
+    const y2 = cy - Math.cos(th) * len;
+
+    // petit liseré blanc puis trait noir (effet proche du CSS)
+    octx.lineCap = 'round';
+
+    octx.lineWidth = 6 * scaleA;
+    octx.strokeStyle = 'rgba(255,255,255,0.85)';
+    octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(x2, y2); octx.stroke();
+
+    octx.lineWidth = 4 * scaleA;
+    octx.strokeStyle = '#111';
+    octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(x2, y2); octx.stroke();
+
+    // pastille centrale
+    const capR = 0.09 * Math.min(r.width * scaleX, r.height * scaleY);
+    octx.fillStyle = '#e9e7df';
+    octx.strokeStyle = 'rgba(0,0,0,0.25)';
+    octx.lineWidth = 1 * scaleA;
+    octx.beginPath(); octx.arc(cx, cy, capR, 0, Math.PI * 2); octx.fill(); octx.stroke();
+  }
+
+  // angles actuels des deux knobs (mêmes calculs que pour le DOM)
+  const angV = (function(){ return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (vIndex / (VDIV_STEPS.length - 1)); })();
+  const angT = (function(){ return MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * (tIndex / (TDIV_STEPS.length - 1)); })();
+
+  drawNeedleFromRect(kVRect, angV);
+  drawNeedleFromRect(kTRect, angT);
+
+  // 4) Téléchargement
+  const a = document.createElement('a');
+  a.href = out.toDataURL('image/png');
+  a.download = 'oscilloscope_complet.png';
+  document.body.appendChild(a); a.click(); a.remove();
 }
+
 ui.exportPng.addEventListener('click', exportFullPNG);
 
 // ---- INIT ----
