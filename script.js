@@ -361,7 +361,7 @@ function exportFullPNG() {
   // 4) Téléchargement
   const a = document.createElement('a');
   a.href = out.toDataURL('image/png');
-  a.download = 'oscilloscope_complet.png';
+  a.download = exportFileNameFromState();
   document.body.appendChild(a); a.click(); a.remove();
 }
 
@@ -390,4 +390,38 @@ document.getElementById('scope').addEventListener('click', (e)=>{
   const yPct = ((e.clientY - r.top)  / r.height) * 100;
   console.log(`--left: ${xPct.toFixed(1)}%;  --top: ${yPct.toFixed(1)}%;`);
 });
+
+// Formattage SI compact pour noms de fichiers
+function fmtSI(val, kind) { // kind: 'Hz' ou 'V'
+    const a = Math.abs(val);
+    let unit = kind, scale = 1;
+    if (kind === 'Hz') {
+        if (a >= 1e6) { unit = 'MHz'; scale = 1e6; }
+        else if (a >= 1e3) { unit = 'kHz'; scale = 1e3; }
+        else { unit = 'Hz'; scale = 1; }
+    } else if (kind === 'V') {
+        if (a < 1e-3) { unit = 'uV'; scale = 1e-6; }
+        else if (a < 1) { unit = 'mV'; scale = 1e-3; }
+        else { unit = 'V'; scale = 1; }
+    }
+    const n = val / scale;
+    const s = (Math.round(n * 1000) / 1000).toString()
+        .replace(/\.0+$/, '')
+        .replace(/(\.\d*[1-9])0+$/, '$1');
+    return s + unit;
+}
+
+function exportFileNameFromState() {
+  // lit les valeurs actuelles de l’interface
+  const wave = (ui.wave?.value || 'sine').toLowerCase(); // 'sine' | 'square' | 'triangle'
+  const f     = readNum(ui.freq, 50);
+  const um    = Math.abs(readNum(ui.amp, 2));  // Umax (amplitude crête)
+  const ucc   = readNum(ui.offset, 0);         // composante continue
+
+  const fStr  = fmtSI(f, 'Hz');
+  const umStr = fmtSI(um, 'V');
+  const uccStr= fmtSI(ucc, 'V');
+
+  return `${wave}_f-${fStr}_Umax-${umStr}_Ucc-${uccStr}.png`;
+}
 
