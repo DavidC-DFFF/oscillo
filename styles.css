@@ -308,25 +308,67 @@ body {
 }
 
 /* ——— Footer crédit toujours visible ——— */
-:root { --footer-height: 36px; }
+:root {
+    --footer-height: 36px;
+}
 
 /* réserve l’espace pour ne pas masquer le contenu */
-body { padding-bottom: var(--footer-height); }
+body {
+    padding-bottom: var(--footer-height);
+}
 
-.app-footer{
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  min-height: var(--footer-height);
-  display: flex; align-items: center; justify-content: center;
-  font-size: .85rem;
-  opacity: .6;
-  padding: 6px 10px;
-  border-top: 1px solid currentColor;
-  background: transparent;  /* discret */
-  pointer-events: none;      /* pas cliquable, enlève cette ligne si tu veux un lien */
-  z-index: 9999;
+.app-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: var(--footer-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    opacity: .6;
+    padding: 6px 10px;
+    border-top: 1px solid currentColor;
+    background: transparent;
+    /* discret */
+    pointer-events: none;
+    /* pas cliquable, enlève cette ligne si tu veux un lien */
+    z-index: 9999;
 }
 
 /* légère teinte si fenêtre très basse */
-@media (max-height: 520px){ .app-footer{ background: rgba(0,0,0,.04); } }
-@media (prefers-color-scheme: dark){ .app-footer{ background: rgba(255,255,255,.04); } }
+@media (max-height: 520px) {
+    .app-footer {
+        background: rgba(0, 0, 0, .04);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .app-footer {
+        background: rgba(255, 255, 255, .04);
+    }
+}
+
+.credit-btn {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    font-size: 0.8rem;
+    background: transparent;
+    color: currentColor;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    padding: 4px 8px;
+    opacity: 0.5;
+    cursor: default;
+    z-index: 9999;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    /* désactive clic, supprime si tu veux cliquable */
+}
+
+.credit-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+    /* ou clair en mode sombre */
+}
